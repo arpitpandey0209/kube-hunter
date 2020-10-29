@@ -1,25 +1,29 @@
-FROM python:3.7-alpine3.10 as builder
+FROM python:3.8-alpine as builder
 
 RUN apk add --no-cache \
     linux-headers \
     tcpdump \
     build-base \
-    ebtables
+    ebtables \
+    make \
+    git && \
+    apk upgrade --no-cache
 
 WORKDIR /kube-hunter
-COPY ./requirements.txt /kube-hunter/.
-RUN pip install -r /kube-hunter/requirements.txt -t /kube-hunter
+COPY setup.py setup.cfg Makefile ./
+RUN make deps
 
-COPY . /kube-hunter
+COPY . .
+RUN make install
 
-FROM python:3.7-alpine3.10
+FROM python:3.8-alpine
 
 RUN apk add --no-cache \
-    tcpdump
-RUN apk upgrade --no-cache 
+    tcpdump \
+    ebtables && \
+    apk upgrade --no-cache
 
-COPY --from=builder /kube-hunter /kube-hunter
+COPY --from=builder /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
+COPY --from=builder /usr/local/bin/kube-hunter /usr/local/bin/kube-hunter
 
-WORKDIR /kube-hunter
-
-ENTRYPOINT ["python",  "kube-hunter.py"]
+ENTRYPOINT ["kube-hunter"]
